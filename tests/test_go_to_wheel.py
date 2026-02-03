@@ -412,3 +412,75 @@ class TestPackageNaming:
         wheel_path = Path(wheels[0])
         # PEP 427: Replace hyphens with underscores in wheel filename
         assert "my_cool_tool-" in wheel_path.name
+
+
+class TestReadmeOption:
+    """Tests for the --readme option."""
+
+    def test_readme_in_metadata(self, tmp_path):
+        """Test that README content appears in METADATA as long description."""
+        output_dir = tmp_path / "dist"
+        output_dir.mkdir()
+
+        # Create a README file
+        readme_path = tmp_path / "README.md"
+        readme_content = "# My Tool\n\nThis is a great tool.\n\n## Features\n\n- Fast\n- Simple"
+        readme_path.write_text(readme_content)
+
+        current_platform = get_current_platform()
+        wheels = build_wheels(
+            str(GO_EXAMPLE_DIR),
+            name="my-tool",
+            version="1.0.0",
+            output_dir=str(output_dir),
+            platforms=[current_platform],
+            readme=str(readme_path),
+        )
+
+        with zipfile.ZipFile(wheels[0], "r") as whl:
+            metadata_file = [n for n in whl.namelist() if n.endswith("METADATA")][0]
+            metadata = whl.read(metadata_file).decode("utf-8")
+
+            # Should have content type header
+            assert "Description-Content-Type: text/markdown" in metadata
+            # Should have the README content as the body
+            assert "# My Tool" in metadata
+            assert "This is a great tool." in metadata
+            assert "## Features" in metadata
+
+    def test_readme_file_not_found(self, tmp_path):
+        """Test that non-existent README file raises error."""
+        output_dir = tmp_path / "dist"
+        output_dir.mkdir()
+
+        current_platform = get_current_platform()
+        with pytest.raises(FileNotFoundError, match="README"):
+            build_wheels(
+                str(GO_EXAMPLE_DIR),
+                name="my-tool",
+                version="1.0.0",
+                output_dir=str(output_dir),
+                platforms=[current_platform],
+                readme=str(tmp_path / "nonexistent.md"),
+            )
+
+    def test_metadata_without_readme(self, tmp_path):
+        """Test that METADATA without README has no long description."""
+        output_dir = tmp_path / "dist"
+        output_dir.mkdir()
+
+        current_platform = get_current_platform()
+        wheels = build_wheels(
+            str(GO_EXAMPLE_DIR),
+            name="my-tool",
+            version="1.0.0",
+            output_dir=str(output_dir),
+            platforms=[current_platform],
+        )
+
+        with zipfile.ZipFile(wheels[0], "r") as whl:
+            metadata_file = [n for n in whl.namelist() if n.endswith("METADATA")][0]
+            metadata = whl.read(metadata_file).decode("utf-8")
+
+            # Should not have content type header when no README
+            assert "Description-Content-Type:" not in metadata
