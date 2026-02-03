@@ -1,0 +1,27 @@
+[project]
+name = "go-to-wheel"
+version = "0.1.0"
+description = "Compile Go CLI programs into Python wheels"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [
+    { name = "Simon Willison" }
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/simonw/go-to-wheel"
+Issues = "https://github.com/simonw/go-to-wheel/issues"
+CI = "https://github.com/simonw/go-to-wheel/actions"
+Changelog = "https://github.com/simonw/go-to-wheel/releases"
+
+[project.scripts]
+go-to-wheel = "go_to_wheel:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0", "uv>=0.5"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

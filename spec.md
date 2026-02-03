@@ -29,7 +29,7 @@ go-to-wheel path/to/go-folder
 | `--author AUTHOR` | Author name | None |
 | `--author-email EMAIL` | Author email | None |
 | `--url URL` | Project URL | None |
-| `--requires-python VERSION` | Python version requirement | `>=3.8` |
+| `--requires-python VERSION` | Python version requirement | `>=3.10` |
 
 ### Examples
 
@@ -272,7 +272,7 @@ The import name (used for the Python package directory) follows PEP 8:
 ## Dependencies
 
 The tool itself requires:
-- Python >= 3.8
+- Python >= 3.10
 - No external Python dependencies (uses stdlib only)
 
 Build requirements:
