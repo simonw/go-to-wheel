@@ -145,6 +145,7 @@ def generate_metadata(
     author_email: str | None = None,
     license_: str | None = None,
     url: str | None = None,
+    readme_content: str | None = None,
 ) -> str:
     """Generate METADATA file content."""
     lines = [
@@ -164,6 +165,12 @@ def generate_metadata(
         lines.append(f"Home-page: {url}")
 
     lines.append(f"Requires-Python: {requires_python}")
+
+    if readme_content:
+        lines.append("Description-Content-Type: text/markdown")
+        # Add blank line before body, then the README content
+        lines.append("")
+        lines.append(readme_content)
 
     return "\n".join(lines) + "\n"
 
@@ -214,6 +221,7 @@ def build_wheel(
     author_email: str | None = None,
     license_: str | None = None,
     url: str | None = None,
+    readme_content: str | None = None,
 ) -> str:
     """Build a wheel file from a compiled binary."""
     normalized_name = normalize_package_name(name)
@@ -247,6 +255,7 @@ def build_wheel(
         author_email=author_email,
         license_=license_,
         url=url,
+        readme_content=readme_content,
     ).encode("utf-8")
 
     wheel_content = generate_wheel_metadata(platform_tag).encode("utf-8")
@@ -298,6 +307,7 @@ def build_wheels(
     author_email: str | None = None,
     license_: str | None = None,
     url: str | None = None,
+    readme: str | None = None,
 ) -> list[str]:
     """
     Build Python wheels from a Go module.
@@ -316,6 +326,7 @@ def build_wheels(
         author_email: Author email
         license_: License identifier
         url: Project URL
+        readme: Path to README markdown file for PyPI long description
 
     Returns:
         List of paths to built wheel files
@@ -328,6 +339,14 @@ def build_wheels(
 
     if not (go_path / "go.mod").exists():
         raise ValueError(f"Not a Go module: {go_dir} (no go.mod file found)")
+
+    # Read README file if provided
+    readme_content: str | None = None
+    if readme:
+        readme_path = Path(readme)
+        if not readme_path.exists():
+            raise FileNotFoundError(f"README file not found: {readme}")
+        readme_content = readme_path.read_text(encoding="utf-8")
 
     # Set defaults
     if name is None:
@@ -386,6 +405,7 @@ def build_wheels(
                 author_email=author_email,
                 license_=license_,
                 url=url,
+                readme_content=readme_content,
             )
 
             built_wheels.append(wheel_path)
@@ -458,6 +478,10 @@ def main() -> int:
         "--url",
         help="Project URL",
     )
+    parser.add_argument(
+        "--readme",
+        help="Path to README markdown file for PyPI long description",
+    )
 
     args = parser.parse_args()
 
@@ -485,6 +509,7 @@ def main() -> int:
             author_email=args.author_email,
             license_=args.license_,
             url=args.url,
+            readme=args.readme,
         )
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)

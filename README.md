@@ -51,6 +51,7 @@ go-to-wheel path/to/go-folder [options]
 | `--author-email EMAIL` | Author email | None |
 | `--url URL` | Project URL | None |
 | `--requires-python VERSION` | Python version requirement | `>=3.10` |
+| `--readme PATH` | Path to README markdown file for PyPI long description | None |
 
 ### Examples
 
@@ -76,7 +77,8 @@ go-to-wheel ./mytool \
   --license MIT \
   --author "Jane Doe" \
   --author-email "jane@example.com" \
-  --url "https://github.com/jane/mytool"
+  --url "https://github.com/jane/mytool" \
+  --readme README.md
 ```
 
 ## Supported platforms
