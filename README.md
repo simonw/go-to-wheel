@@ -52,6 +52,8 @@ go-to-wheel path/to/go-folder [options]
 | `--url URL` | Project URL | None |
 | `--requires-python VERSION` | Python version requirement | `>=3.10` |
 | `--readme PATH` | Path to README markdown file for PyPI long description | None |
+| `--set-version-var VAR` | Go variable to set to `--version` value via `-X` ldflag | None |
+| `--ldflags FLAGS` | Additional Go linker flags (appended to default `-s -w`) | None |
 
 ### Examples
 
@@ -66,6 +68,33 @@ Build for specific platforms only:
 ```bash
 go-to-wheel ./mytool --platforms linux-amd64,darwin-arm64
 ```
+
+Embed the wheel version into the Go binary at compile time (requires a `var version` in your Go source):
+
+```bash
+go-to-wheel ./mytool --version 2.0.0 --set-version-var main.version
+```
+
+This passes `-X main.version=2.0.0` to the Go linker, so the compiled binary knows its own version without hardcoding it in the Go source. A typical Go pattern for this:
+
+```go
+var version = "dev"
+
+func main() {
+    if os.Args[1] == "--version" {
+        fmt.Println(version) // prints "2.0.0" when built with --set-version-var
+    }
+}
+```
+
+Pass arbitrary Go linker flags with `--ldflags`:
+
+```bash
+go-to-wheel ./mytool --version 2.0.0 \
+  --ldflags "-X main.version=2.0.0 -X main.commit=abc123"
+```
+
+The flags are appended to the default `-s -w`, so the full linker invocation becomes `-ldflags="-s -w -X main.version=2.0.0 -X main.commit=abc123"`.
 
 Build with full metadata for PyPI:
 
