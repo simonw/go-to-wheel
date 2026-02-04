@@ -1,0 +1,155 @@
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+    - uses: actions/checkout@v6
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+        cache-dependency-path: pyproject.toml
+    - name: Install dependencies
+      run: |
+        pip install -e . --group dev
+    - name: Run tests
+      run: |
+        pytest -vv
+
+  build-wheels:
+    runs-on: ${{ matrix.build-os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Ubuntu builds - native and cross-compilation to all targets
+          - build-os: ubuntu-latest
+            target-platform: linux-amd64
+          - build-os: ubuntu-latest
+            target-platform: linux-arm64
+          - build-os: ubuntu-latest
+            target-platform: darwin-amd64
+          - build-os: ubuntu-latest
+            target-platform: darwin-arm64
+          - build-os: ubuntu-latest
+            target-platform: windows-amd64
+          # macOS builds - native and cross-compilation
+          - build-os: macos-latest
+            target-platform: darwin-arm64
+          - build-os: macos-latest
+            target-platform: linux-amd64
+          - build-os: macos-latest
+            target-platform: windows-amd64
+          # Windows builds - native and cross-compilation
+          - build-os: windows-latest
+            target-platform: windows-amd64
+          - build-os: windows-latest
+            target-platform: linux-amd64
+          - build-os: windows-latest
+            target-platform: darwin-arm64
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+    - uses: actions/setup-go@v5
+      with:
+        go-version: 'stable'
+    - name: Install go-to-wheel
+      run: pip install .
+    - name: Build wheel for ${{ matrix.target-platform }}
+      shell: bash
+      run: |
+        go-to-wheel tests/go-example \
+          --name go-example \
+          --version 1.0.0 \
+          --platforms ${{ matrix.target-platform }} \
+          --output-dir dist
+    - uses: actions/upload-artifact@v4
+      with:
+        name: wheel-${{ matrix.build-os }}-${{ matrix.target-platform }}
+        path: dist/*.whl
+
+  test-wheels:
+    needs: build-wheels
+    runs-on: ${{ matrix.test-os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Test linux-amd64 wheels built on each OS
+          - test-os: ubuntu-latest
+            build-os: ubuntu-latest
+            target-platform: linux-amd64
+          - test-os: ubuntu-latest
+            build-os: macos-latest
+            target-platform: linux-amd64
+          - test-os: ubuntu-latest
+            build-os: windows-latest
+            target-platform: linux-amd64
+          # Test linux-arm64 wheel built on ubuntu
+          - test-os: ubuntu-24.04-arm
+            build-os: ubuntu-latest
+            target-platform: linux-arm64
+          # Test darwin-arm64 wheels built on each OS
+          - test-os: macos-latest
+            build-os: ubuntu-latest
+            target-platform: darwin-arm64
+          - test-os: macos-latest
+            build-os: macos-latest
+            target-platform: darwin-arm64
+          - test-os: macos-latest
+            build-os: windows-latest
+            target-platform: darwin-arm64
+          # Test darwin-amd64 wheel built on ubuntu
+          - test-os: macos-13
+            build-os: ubuntu-latest
+            target-platform: darwin-amd64
+          # Test windows-amd64 wheels built on each OS
+          - test-os: windows-latest
+            build-os: ubuntu-latest
+            target-platform: windows-amd64
+          - test-os: windows-latest
+            build-os: macos-latest
+            target-platform: windows-amd64
+          - test-os: windows-latest
+            build-os: windows-latest
+            target-platform: windows-amd64
+    steps:
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+    - uses: astral-sh/setup-uv@v4
+    - uses: actions/download-artifact@v4
+      with:
+        name: wheel-${{ matrix.build-os }}-${{ matrix.target-platform }}
+        path: dist
+    - name: Test wheel (built on ${{ matrix.build-os }} for ${{ matrix.target-platform }})
+      shell: bash
+      run: |
+        WHEEL=$(ls dist/*.whl | head -1)
+        echo "Testing wheel: $WHEEL"
+        echo "Built on: ${{ matrix.build-os }}"
+        echo "Target platform: ${{ matrix.target-platform }}"
+
+        # Test --version
+        OUTPUT=$(uv run --with "$WHEEL" go-example --version)
+        echo "Version output: $OUTPUT"
+        echo "$OUTPUT" | grep -q "go-example 1.0.0"
+
+        # Test --echo
+        OUTPUT=$(uv run --with "$WHEEL" go-example --echo hello world)
+        echo "Echo output: $OUTPUT"
+        echo "$OUTPUT" | grep -q "hello world"
+
+        # Test default output
+        OUTPUT=$(uv run --with "$WHEEL" go-example)
+        echo "Default output: $OUTPUT"
+        echo "$OUTPUT" | grep -q "Hello from go-example!"
