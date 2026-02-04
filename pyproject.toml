@@ -1,6 +1,6 @@
 [project]
 name = "go-to-wheel"
-version = "0.1"
+version = "0.2"
 description = "Compile Go CLI programs into Python wheels"
 readme = "README.md"
 requires-python = ">=3.10"
