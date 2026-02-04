@@ -107,18 +107,20 @@ __version__ = "{version}"
 
 def get_binary_path():
     """Return the path to the bundled binary."""
-    return os.path.join(os.path.dirname(__file__), "bin", "{binary_name}")
-
-
-def main():
-    """Execute the bundled binary."""
-    binary = get_binary_path()
+    binary = os.path.join(os.path.dirname(__file__), "bin", "{binary_name}")
 
     # Ensure binary is executable on Unix
     if sys.platform != "win32":
         current_mode = os.stat(binary).st_mode
         if not (current_mode & stat.S_IXUSR):
             os.chmod(binary, current_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    return binary
+
+
+def main():
+    """Execute the bundled binary."""
+    binary = get_binary_path()
 
     if sys.platform == "win32":
         # On Windows, use subprocess to properly handle signals
