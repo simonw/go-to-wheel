@@ -63,6 +63,7 @@ def compile_go_binary(
     goos: str,
     goarch: str,
     go_binary: str = "go",
+    ldflags: str | None = None,
 ) -> None:
     """Cross-compile Go binary for target platform."""
     env = os.environ.copy()
@@ -70,10 +71,14 @@ def compile_go_binary(
     env["GOARCH"] = goarch
     env["CGO_ENABLED"] = "0"
 
+    ldflags_value = "-s -w"
+    if ldflags:
+        ldflags_value += " " + ldflags
+
     cmd = [
         go_binary,
         "build",
-        "-ldflags=-s -w",
+        f"-ldflags={ldflags_value}",
         "-o",
         output_path,
         ".",
@@ -308,6 +313,8 @@ def build_wheels(
     license_: str | None = None,
     url: str | None = None,
     readme: str | None = None,
+    ldflags: str | None = None,
+    set_version_var: str | None = None,
 ) -> list[str]:
     """
     Build Python wheels from a Go module.
@@ -327,6 +334,9 @@ def build_wheels(
         license_: License identifier
         url: Project URL
         readme: Path to README markdown file for PyPI long description
+        ldflags: Additional Go linker flags (appended to default -s -w)
+        set_version_var: Go variable to set to the package version via
+            -X ldflag (e.g. "main.version")
 
     Returns:
         List of paths to built wheel files
@@ -358,6 +368,15 @@ def build_wheels(
     if platforms is None:
         platforms = DEFAULT_PLATFORMS
 
+    # Build combined ldflags: set_version_var first, then user ldflags
+    # (so explicit ldflags can override set_version_var if both set the same var)
+    combined_ldflags_parts: list[str] = []
+    if set_version_var:
+        combined_ldflags_parts.append(f"-X {set_version_var}={version}")
+    if ldflags:
+        combined_ldflags_parts.append(ldflags)
+    combined_ldflags = " ".join(combined_ldflags_parts) if combined_ldflags_parts else None
+
     # Create output directory
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
@@ -385,6 +404,7 @@ def build_wheels(
                     goos,
                     goarch,
                     go_binary,
+                    ldflags=combined_ldflags,
                 )
             except RuntimeError as e:
                 print(f"Warning: {e}")
@@ -482,6 +502,16 @@ def main() -> int:
         "--readme",
         help="Path to README markdown file for PyPI long description",
     )
+    parser.add_argument(
+        "--ldflags",
+        help="Additional Go linker flags appended to the default '-s -w' "
+        "(e.g. '-X main.version=1.0.0')",
+    )
+    parser.add_argument(
+        "--set-version-var",
+        help="Go variable to set to the package version via -X ldflag "
+        "(e.g. 'main.version'). The value is taken from --version automatically.",
+    )
 
     args = parser.parse_args()
 
@@ -510,6 +540,8 @@ def main() -> int:
             license_=args.license_,
             url=args.url,
             readme=args.readme,
+            ldflags=args.ldflags,
+            set_version_var=args.set_version_var,
         )
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)

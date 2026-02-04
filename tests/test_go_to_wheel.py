@@ -15,6 +15,9 @@ from go_to_wheel import build_wheels
 # Path to our test Go example
 GO_EXAMPLE_DIR = Path(__file__).parent / "go-example"
 
+# Go example that uses var version = "dev" pattern for ldflags injection
+GO_EXAMPLE_VERSION_DIR = Path(__file__).parent / "go-example-version"
+
 
 def get_current_platform() -> str:
     """Get the platform string for the current system."""
@@ -484,3 +487,187 @@ class TestReadmeOption:
 
             # Should not have content type header when no README
             assert "Description-Content-Type:" not in metadata
+
+
+class TestLdflags:
+    """Tests for --ldflags support."""
+
+    def test_ldflags_passed_to_go_build(self, tmp_path):
+        """Test that custom ldflags are appended to the default -s -w flags."""
+        output_dir = tmp_path / "dist"
+        output_dir.mkdir()
+
+        current_platform = get_current_platform()
+        wheels = build_wheels(
+            str(GO_EXAMPLE_VERSION_DIR),
+            name="go-example-version",
+            version="3.2.1",
+            output_dir=str(output_dir),
+            platforms=[current_platform],
+            ldflags="-X main.version=3.2.1",
+        )
+
+        assert len(wheels) == 1
+
+        # Verify the version was actually baked into the binary
+        wheel_path = wheels[0]
+        result = subprocess.run(
+            ["uv", "run", "--with", wheel_path, "go-example-version", "--version"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        assert "3.2.1" in result.stdout
+
+    def test_ldflags_without_version_injection(self, tmp_path):
+        """Test that without ldflags, the binary has the default 'dev' version."""
+        output_dir = tmp_path / "dist"
+        output_dir.mkdir()
+
+        current_platform = get_current_platform()
+        wheels = build_wheels(
+            str(GO_EXAMPLE_VERSION_DIR),
+            name="go-example-version",
+            version="1.0.0",
+            output_dir=str(output_dir),
+            platforms=[current_platform],
+        )
+
+        wheel_path = wheels[0]
+        result = subprocess.run(
+            ["uv", "run", "--with", wheel_path, "go-example-version", "--version"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        assert "dev" in result.stdout
+
+    def test_ldflags_multiple_x_flags(self, tmp_path):
+        """Test that multiple -X flags can be passed via ldflags."""
+        output_dir = tmp_path / "dist"
+        output_dir.mkdir()
+
+        current_platform = get_current_platform()
+        wheels = build_wheels(
+            str(GO_EXAMPLE_VERSION_DIR),
+            name="go-example-version",
+            version="5.0.0",
+            output_dir=str(output_dir),
+            platforms=[current_platform],
+            ldflags="-X main.version=5.0.0",
+        )
+
+        wheel_path = wheels[0]
+        result = subprocess.run(
+            ["uv", "run", "--with", wheel_path, "go-example-version", "--version"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        assert "5.0.0" in result.stdout
+
+
+class TestSetVersionVar:
+    """Tests for --set-version-var support."""
+
+    def test_set_version_var_injects_version(self, tmp_path):
+        """Test that --set-version-var auto-fills from --version."""
+        output_dir = tmp_path / "dist"
+        output_dir.mkdir()
+
+        current_platform = get_current_platform()
+        wheels = build_wheels(
+            str(GO_EXAMPLE_VERSION_DIR),
+            name="go-example-version",
+            version="7.8.9",
+            output_dir=str(output_dir),
+            platforms=[current_platform],
+            set_version_var="main.version",
+        )
+
+        assert len(wheels) == 1
+
+        # The binary should report 7.8.9 (the --version value), not "dev"
+        wheel_path = wheels[0]
+        result = subprocess.run(
+            ["uv", "run", "--with", wheel_path, "go-example-version", "--version"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        assert "7.8.9" in result.stdout
+
+    def test_set_version_var_combined_with_ldflags(self, tmp_path):
+        """Test that --set-version-var and --ldflags can be used together."""
+        output_dir = tmp_path / "dist"
+        output_dir.mkdir()
+
+        current_platform = get_current_platform()
+        # --set-version-var sets main.version, --ldflags adds extra flags
+        wheels = build_wheels(
+            str(GO_EXAMPLE_VERSION_DIR),
+            name="go-example-version",
+            version="2.0.0",
+            output_dir=str(output_dir),
+            platforms=[current_platform],
+            set_version_var="main.version",
+            ldflags="-X main.version=override",
+        )
+
+        wheel_path = wheels[0]
+        result = subprocess.run(
+            ["uv", "run", "--with", wheel_path, "go-example-version", "--version"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        # ldflags comes after set_version_var, so it should override
+        assert "override" in result.stdout
+
+
+class TestLdflagsCLI:
+    """Tests for --ldflags and --set-version-var CLI argument parsing."""
+
+    def test_cli_ldflags_argument(self, tmp_path):
+        """Test that --ldflags is accepted as a CLI argument."""
+        output_dir = tmp_path / "dist"
+        output_dir.mkdir()
+
+        current_platform = get_current_platform()
+        result = subprocess.run(
+            [
+                "go-to-wheel",
+                str(GO_EXAMPLE_VERSION_DIR),
+                "--name", "go-example-version",
+                "--version", "1.0.0",
+                "--output-dir", str(output_dir),
+                "--platforms", current_platform,
+                "--ldflags", "-X main.version=1.0.0",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        assert "Built 1 wheel" in result.stdout
+
+    def test_cli_set_version_var_argument(self, tmp_path):
+        """Test that --set-version-var is accepted as a CLI argument."""
+        output_dir = tmp_path / "dist"
+        output_dir.mkdir()
+
+        current_platform = get_current_platform()
+        result = subprocess.run(
+            [
+                "go-to-wheel",
+                str(GO_EXAMPLE_VERSION_DIR),
+                "--name", "go-example-version",
+                "--version", "4.5.6",
+                "--output-dir", str(output_dir),
+                "--platforms", current_platform,
+                "--set-version-var", "main.version",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        assert "Built 1 wheel" in result.stdout
