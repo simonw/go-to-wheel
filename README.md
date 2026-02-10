@@ -9,6 +9,8 @@ Compile Go CLI programs into Python wheels.
 
 This tool takes a Go module directory, cross-compiles it for multiple platforms, and produces properly-tagged Python wheels that can be installed via `pip` or `pipx` to get the Go binary on your PATH.
 
+See [Distributing Go binaries like sqlite-scanner through PyPI using go-to-wheel](https://simonwillison.net/2026/Feb/4/distributing-go-binaries/) for background on this project.
+
 ## Installation
 
 ```bash
