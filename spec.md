@@ -24,6 +24,7 @@ go-to-wheel path/to/go-folder
 | `--entry-point NAME` | CLI command name | Same as package name |
 | `--platforms PLATFORMS` | Comma-separated list of targets | See default platforms |
 | `--go-binary PATH` | Path to Go binary | `go` (from PATH) |
+| `--package-path PATH` | Path to the Go package to build | `.` (current directory) |
 | `--description TEXT` | Package description | `"Go binary packaged as Python wheel"` |
 | `--license LICENSE` | License identifier | None |
 | `--author AUTHOR` | Author name | None |
@@ -55,6 +56,13 @@ go-to-wheel ./mytool \
   --author "Jane Doe" \
   --author-email "jane@example.com" \
   --url "https://github.com/jane/mytool"
+
+# Build a sub-package (e.g., ./cmd/myapp)
+go-to-wheel ./myproject \
+  --name myapp \
+  --version 1.0.0 \
+  --package-path ./cmd/myapp \
+  --entry-point myapp
 ```
 
 ## Target Platforms
@@ -170,13 +178,14 @@ For each target platform:
 GOOS={goos} GOARCH={goarch} CGO_ENABLED=0 go build \
   -ldflags="-s -w" \
   -o {output_path} \
-  {go_module_path}
+  {go_module_path}/{package_path}
 ```
 
 Notes:
 - `CGO_ENABLED=0` ensures static binaries (no libc dependency issues)
 - `-ldflags="-s -w"` strips debug info and reduces binary size
 - Windows builds automatically get `.exe` extension
+- `package_path` specifies the package path to build (defaults to current directory `.`)
 
 ### Step 3: Build Wheels
 

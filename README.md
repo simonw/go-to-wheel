@@ -47,6 +47,7 @@ go-to-wheel path/to/go-folder [options]
 | `--entry-point NAME` | CLI command name | Same as package name |
 | `--platforms PLATFORMS` | Comma-separated list of targets | All supported platforms |
 | `--go-binary PATH` | Path to Go binary | `go` |
+| `--package-path PATH` | Path to the Go package to build (relative to module root) | `.` |
 | `--description TEXT` | Package description | `"Go binary packaged as Python wheel"` |
 | `--license LICENSE` | License identifier | None |
 | `--author AUTHOR` | Author name | None |
@@ -69,6 +70,12 @@ Build for specific platforms only:
 
 ```bash
 go-to-wheel ./mytool --platforms linux-amd64,darwin-arm64
+```
+
+Build a sub-package within your Go module:
+
+```bash
+go-to-wheel ./myproject --package-path ./cmd/myapp --name myapp
 ```
 
 Embed the wheel version into the Go binary at compile time (requires a `var version` in your Go source):

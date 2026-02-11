@@ -18,6 +18,9 @@ GO_EXAMPLE_DIR = Path(__file__).parent / "go-example"
 # Go example that uses var version = "dev" pattern for ldflags injection
 GO_EXAMPLE_VERSION_DIR = Path(__file__).parent / "go-example-version"
 
+# Go example with sub-package for go_cmd testing
+GO_EXAMPLE_SUBPKG_DIR = Path(__file__).parent / "go-example-subpkg"
+
 
 def get_current_platform() -> str:
     """Get the platform string for the current system."""
@@ -375,6 +378,21 @@ class TestErrorHandling:
                 output_dir=str(output_dir),
             )
 
+    def test_invalid_package_path(self, tmp_path):
+        """Test that invalid package_path raises error."""
+        output_dir = tmp_path / "dist"
+        output_dir.mkdir()
+
+        with pytest.raises(FileNotFoundError, match="Go package not found"):
+            build_wheels(
+                str(GO_EXAMPLE_DIR),
+                name="test",
+                output_dir=str(output_dir),
+                package_path="nonexistent",
+            )
+
+
+
 
 class TestPackageNaming:
     """Tests for package naming conventions."""
@@ -671,3 +689,48 @@ class TestLdflagsCLI:
         )
         assert result.returncode == 0
         assert "Built 1 wheel" in result.stdout
+
+
+class TestPackagePath:
+    """Tests for package_path parameter to build sub-packages."""
+
+    def test_build_with_package_path_subpackage(self, tmp_path):
+        """Test building a wheel with package_path pointing to sub-package."""
+        output_dir = tmp_path / "dist"
+        output_dir.mkdir()
+
+        current_platform = get_current_platform()
+
+        # Build wheel using package_path to specify sub-package
+        wheels = build_wheels(
+            str(GO_EXAMPLE_SUBPKG_DIR),
+            name="myapp",
+            version="1.0.0",
+            output_dir=str(output_dir),
+            platforms=[current_platform],
+            package_path="./cmd/myapp",
+        )
+
+        assert len(wheels) == 1
+        wheel_path = Path(wheels[0])
+        assert wheel_path.exists()
+
+        # Verify wheel filename
+        platform_tag = get_wheel_platform_tag(current_platform)
+        expected_name = f"myapp-1.0.0-py3-none-{platform_tag}.whl"
+        assert wheel_path.name == expected_name
+
+        # Verify wheel contents
+        with zipfile.ZipFile(wheel_path, "r") as zf:
+            names = zf.namelist()
+
+            # Should have the binary
+            binary_name = "myapp"
+            if current_platform.startswith("windows"):
+                binary_name += ".exe"
+            assert f"myapp/bin/{binary_name}" in names
+
+            # Should have required metadata files
+            assert "myapp-1.0.0.dist-info/WHEEL" in names
+            assert "myapp-1.0.0.dist-info/METADATA" in names
+            assert "myapp-1.0.0.dist-info/RECORD" in names
