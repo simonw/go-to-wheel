@@ -64,6 +64,7 @@ def compile_go_binary(
     goarch: str,
     go_binary: str = "go",
     ldflags: str | None = None,
+    package_path: str = ".",
 ) -> None:
     """Cross-compile Go binary for target platform."""
     env = os.environ.copy()
@@ -81,7 +82,7 @@ def compile_go_binary(
         f"-ldflags={ldflags_value}",
         "-o",
         output_path,
-        ".",
+        package_path,
     ]
 
     result = subprocess.run(
@@ -308,6 +309,7 @@ def build_wheels(
     entry_point: str | None = None,
     platforms: list[str] | None = None,
     go_binary: str = "go",
+    package_path: str = ".",
     description: str = "Go binary packaged as Python wheel",
     requires_python: str = ">=3.10",
     author: str | None = None,
@@ -329,6 +331,7 @@ def build_wheels(
         entry_point: CLI command name (defaults to package name)
         platforms: List of target platforms (defaults to all supported)
         go_binary: Path to Go binary
+        package_path: Path to the Go package to build (defaults to .)
         description: Package description
         requires_python: Python version requirement
         author: Author name
@@ -344,6 +347,7 @@ def build_wheels(
         List of paths to built wheel files
     """
     go_path = Path(go_dir).resolve()
+    go_package = go_path / package_path
 
     # Validate Go directory
     if not go_path.exists():
@@ -352,10 +356,14 @@ def build_wheels(
     if not (go_path / "go.mod").exists():
         raise ValueError(f"Not a Go module: {go_dir} (no go.mod file found)")
 
+    # Validate Go package
+    if not go_package.exists():
+        raise FileNotFoundError(f"Go package not found: {package_path}")
+
     # Read README file if provided
     readme_content: str | None = None
     if readme:
-        readme_path = Path(readme)
+        readme_path = go_path / readme
         if not readme_path.exists():
             raise FileNotFoundError(f"README file not found: {readme}")
         readme_content = readme_path.read_text(encoding="utf-8")
@@ -407,6 +415,7 @@ def build_wheels(
                     goarch,
                     go_binary,
                     ldflags=combined_ldflags,
+                    package_path=package_path,
                 )
             except RuntimeError as e:
                 print(f"Warning: {e}")
@@ -474,6 +483,11 @@ def main() -> int:
         help="Path to Go binary (default: go)",
     )
     parser.add_argument(
+        "--package-path",
+        default=".",
+        help="Path to the Go package to build (defaults to .)",
+    )
+    parser.add_argument(
         "--description",
         default="Go binary packaged as Python wheel",
         help="Package description",
@@ -535,6 +549,7 @@ def main() -> int:
             entry_point=args.entry_point,
             platforms=platforms,
             go_binary=args.go_binary,
+            package_path=args.package_path,
             description=args.description,
             requires_python=args.requires_python,
             author=args.author,
