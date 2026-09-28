@@ -146,6 +146,24 @@ class TestBuildWheels:
             assert any("RECORD" in n for n in names)
             assert any("entry_points.txt" in n for n in names)
 
+    def test_wheel_binary_is_compressed(self, tmp_path):
+        """Test that the binary is deflated rather than stored uncompressed."""
+        output_dir = tmp_path / "dist"
+        output_dir.mkdir()
+
+        wheels = build_wheels(
+            str(GO_EXAMPLE_DIR),
+            name="go-example",
+            version="1.0.0",
+            output_dir=str(output_dir),
+            platforms=[get_current_platform()],
+        )
+
+        with zipfile.ZipFile(wheels[0], "r") as whl:
+            binary = next(i for i in whl.infolist() if i.filename.startswith("go_example/bin/"))
+            assert binary.compress_type == zipfile.ZIP_DEFLATED
+            assert binary.compress_size < binary.file_size
+
     def test_wheel_metadata_content(self, tmp_path):
         """Test that METADATA file contains correct content."""
         output_dir = tmp_path / "dist"

@@ -292,7 +292,8 @@ def build_wheel(
                 info = zipfile.ZipInfo(file_path)
                 # Set Unix permissions: rwxr-xr-x (0755)
                 info.external_attr = (stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH) << 16
-                whl.writestr(info, content)
+                # A bare ZipInfo defaults to ZIP_STORED, ignoring the archive's compression
+                whl.writestr(info, content, compress_type=zipfile.ZIP_DEFLATED)
             else:
                 whl.writestr(file_path, content)
 
