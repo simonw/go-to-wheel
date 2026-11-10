@@ -6,6 +6,7 @@ import csv
 import hashlib
 import io
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -42,7 +43,7 @@ DEFAULT_PLATFORMS = [
 
 def normalize_package_name(name: str) -> str:
     """Normalize package name for wheel filename (PEP 427)."""
-    return name.replace("-", "_").replace(".", "_").lower()
+    return re.sub(r"[-_.]+", "_", name).lower()
 
 
 def normalize_import_name(name: str) -> str:
